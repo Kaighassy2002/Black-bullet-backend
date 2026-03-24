@@ -5,14 +5,14 @@ const { verifyToken } = require("../utils/jwt");
 const authenticateAdmin = async (req, _res, next) => {
   try {
     const authorization = req.headers.authorization || "";
+    const cookieToken = req.cookies?.admin_token || "";
+    let token = "";
 
-    if (!authorization.startsWith("Bearer ")) {
-      const error = new Error("Authorization token is missing");
-      error.statusCode = 401;
-      throw error;
+    if (cookieToken) {
+      token = cookieToken;
+    } else if (authorization.startsWith("Bearer ")) {
+      token = authorization.slice("Bearer ".length).trim();
     }
-
-    const token = authorization.slice("Bearer ".length).trim();
 
     if (!token) {
       const error = new Error("Authorization token is missing");
@@ -71,5 +71,6 @@ const requireRole = (...allowedRoles) => (req, _res, next) => {
 
 module.exports = {
   authenticateAdmin,
+  protectAdmin: authenticateAdmin,
   requireRole,
 };
