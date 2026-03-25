@@ -4,6 +4,7 @@ const { Schema } = mongoose;
 
 const bookingSchema = new Schema(
   {
+    // Frontend field: `name`
     customerName: {
       type: String,
       required: [true, "Customer name is required"],
@@ -11,20 +12,41 @@ const bookingSchema = new Schema(
       minlength: [2, "Customer name must be at least 2 characters"],
       maxlength: [120, "Customer name cannot exceed 120 characters"],
       alias: "name",
+      index: true,
     },
+
+    // Frontend field: `email`
+    email: {
+      type: String,
+      required: function () {
+        // Allow updates to pre-existing records that may not have these fields.
+        return this.isNew;
+      },
+      trim: true,
+      lowercase: true,
+      match: [/^\S+@\S+\.\S+$/, "Please provide a valid email address"],
+      index: true,
+    },
+
+    // Not currently collected by the frontend form, but kept for flexibility.
     phone: {
       type: String,
       trim: true,
       minlength: [6, "Phone number is too short"],
       maxlength: [25, "Phone number is too long"],
     },
-    email: {
+
+    // Frontend selection field: vehicle type (e.g. "Supercar / Exotic")
+    vehicleType: {
       type: String,
+      required: function () {
+        return this.isNew;
+      },
       trim: true,
-      lowercase: true,
-      match: [/^\S+@\S+\.\S+$/, "Please provide a valid email address"],
+      maxlength: [120, "Vehicle type cannot exceed 120 characters"],
       index: true,
     },
+
     serviceType: {
       type: String,
       required: [true, "Service type is required"],
@@ -32,11 +54,43 @@ const bookingSchema = new Schema(
       maxlength: [120, "Service type cannot exceed 120 characters"],
       index: true,
     },
+
     preferredDate: {
       type: Date,
       required: [true, "Preferred date is required"],
       index: true,
     },
+
+    // Frontend selection field: time slot (e.g. "09:00 AM")
+    preferredTime: {
+      type: String,
+      required: function () {
+        return this.isNew;
+      },
+      trim: true,
+      maxlength: [20, "Preferred time cannot exceed 20 characters"],
+      index: true,
+    },
+
+    // Helpful for displaying the exact UI selection back to users/admin.
+    preferredDateLabel: {
+      type: String,
+      trim: true,
+      maxlength: [64, "Preferred date label cannot exceed 64 characters"],
+    },
+
+    preferredDay: {
+      type: String,
+      trim: true,
+      maxlength: [3, "Preferred day cannot exceed 3 characters"],
+    },
+
+    preferredDateNumber: {
+      type: Number,
+      min: [1, "Preferred date number must be >= 1"],
+      max: [31, "Preferred date number must be <= 31"],
+    },
+
     vehicleDetails: {
       make: {
         type: String,
@@ -45,8 +99,13 @@ const bookingSchema = new Schema(
       },
       model: {
         type: String,
+        required: function () {
+          return this.isNew;
+        },
         trim: true,
         maxlength: [120, "Vehicle model cannot exceed 120 characters"],
+        // Frontend field: `model`
+        alias: "model",
       },
       year: {
         type: Number,
@@ -65,8 +124,8 @@ const bookingSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "confirmed", "in_progress", "completed", "cancelled"],
-      default: "pending",
+      enum: ["PENDING", "CONFIRMED", "IN-PROGRESS", "COMPLETED", "CANCELLED", "CRITICAL"],
+      default: "PENDING",
       index: true,
     },
   },
@@ -75,14 +134,28 @@ const bookingSchema = new Schema(
   }
 );
 
-bookingSchema.path("phone").validate(function validateContactPhone(value) {
-  return Boolean(value || this.email);
-}, "Either phone or email is required");
+// Normalize legacy status values (e.g. "pending", "in_progress") to the current enum.
+bookingSchema.pre("validate", function normalizeLegacyStatus() {
+  if (typeof this.status === "string") {
+    const candidate = this.status
+      .trim()
+      .toUpperCase()
+      .replace(/_/g, "-")
+      .replace(/\s+/g, "-");
 
-bookingSchema.path("email").validate(function validateContactEmail(value) {
-  return Boolean(value || this.phone);
-}, "Either email or phone is required");
+    const allowed = new Set([
+      "PENDING",
+      "CONFIRMED",
+      "IN-PROGRESS",
+      "COMPLETED",
+      "CANCELLED",
+      "CRITICAL",
+    ]);
+    if (allowed.has(candidate)) this.status = candidate;
+  }
+});
 
+bookingSchema.index({ vehicleType: 1, preferredDate: 1 });
 bookingSchema.index({ serviceType: 1, preferredDate: 1 });
 bookingSchema.index({ status: 1, preferredDate: 1 });
 

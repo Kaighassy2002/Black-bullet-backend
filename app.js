@@ -6,6 +6,12 @@ const morgan = require("morgan");
 const healthRouter = require("./routes/health");
 const mediaRouter = require("./routes/media");
 const authRouter = require("./routes/auth");
+const bookingsRouter = require("./routes/bookings");
+const adminDashboardRouter = require("./routes/adminDashboard");
+const adminServicesRouter = require("./routes/adminServices");
+const adminBlogRouter = require("./routes/adminBlog");
+const adminGalleryRouter = require("./routes/adminGallery");
+const adminBookingsRouter = require("./routes/adminBookings");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
@@ -35,6 +41,12 @@ app.get("/", (_req, res) => {
 
 app.use("/api/health", healthRouter);
 app.use("/api/admin", authRouter);
+app.use("/api/admin/dashboard", adminDashboardRouter);
+app.use("/api/bookings", bookingsRouter);
+app.use("/api/admin/services", adminServicesRouter);
+app.use("/api/admin/blog", adminBlogRouter);
+app.use("/api/admin/gallery", adminGalleryRouter);
+app.use("/api/admin/bookings", adminBookingsRouter);
 app.use("/api/media", mediaRouter);
 
 app.use(notFoundHandler);

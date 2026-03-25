@@ -87,15 +87,130 @@ npm start
   - JSON body: `{ "publicId": "...", "resourceType": "image|video" }`
   - Returns: `{ ok, message }`
 
-- `POST /api/admin/auth/login`
+- `POST /api/admin/login`
   - Login for admin users
   - JSON body: `{ "email": "...", "password": "..." }`
-  - Returns: `{ ok, token, admin }`
+  - Returns: `{ success, message }` and sets `admin_token` cookie
 
-- `GET /api/admin/auth/me`
+- `GET /api/admin/me`
   - Returns currently authenticated admin
-  - Requires `Authorization: Bearer <token>`
+  - Requires `Authorization: Bearer <token>` or `admin_token` cookie
   - Returns: `{ ok, admin }`
+
+- `POST /api/admin/logout`
+  - Clears admin session cookie
+  - Requires authentication
+  - Returns: `{ ok, message }`
+
+- `GET /api/admin/services`
+  - List services with optional pagination/filter query params
+  - Roles: `editor`, `admin`, `super_admin`
+  - Query params: `page`, `limit`, `status`, `category`, `search`
+  - Returns: `{ ok, data, pagination }`
+
+- `POST /api/admin/services`
+  - Create a new service
+  - Roles: `admin`, `super_admin`
+  - Body: `title` (required), optional `slug`, `description`, `price`, `images`, `features`, `category`, `status`, `metaTitle`, `metaDescription`, `metaKeywords`
+  - Returns: `{ ok, data }`
+
+- `GET /api/admin/services/:id`
+  - Fetch one service by Mongo id
+  - Roles: `editor`, `admin`, `super_admin`
+  - Returns: `{ ok, data }`
+
+- `PUT /api/admin/services/:id`
+  - Partially update a service
+  - Roles: `admin`, `super_admin`
+  - Supports optional image cleanup payload: `removedImagePublicIds`, `previousImages`
+  - Returns: `{ ok, data }`
+
+- `DELETE /api/admin/services/:id`
+  - Delete a service
+  - Roles: `admin`, `super_admin`
+  - Optional body: `imagePublicIds` for explicit Cloudinary cleanup
+  - Returns: `{ ok, message }`
+
+- `GET /api/admin/blog`
+  - List blog posts with optional pagination/filter query params
+  - Roles: `editor`, `admin`, `super_admin`
+  - Query params: `page`, `limit`, `status`, `category`, `search`
+  - Returns: `{ ok, data, pagination }`
+
+- `POST /api/admin/blog`
+  - Create a new blog post (slug auto-generated from title when missing)
+  - Roles: `admin`, `super_admin`
+  - Body: `title`, `content` (required), optional `slug`, `category`, `shortDesc`, `author`, `tags`, `image`, `ogImage`, `metaTitle`, `metaDescription`, `status`, `publishedAt`, `views`
+  - `image` / `ogImage` should be Cloudinary URLs (e.g. returned from `/api/media/upload`)
+  - Returns: `{ ok, data }`
+
+- `GET /api/admin/blog/:id`
+  - Fetch one blog post by Mongo id
+  - Roles: `editor`, `admin`, `super_admin`
+  - Returns: `{ ok, data }`
+
+- `PUT /api/admin/blog/:id`
+  - Partially update a blog post
+  - Roles: `admin`, `super_admin`
+  - Body: any subset of the create fields
+  - If `title` changes and `slug` is missing/empty, slug is auto-regenerated from `title`
+  - Cloudinary cleanup: when `image` or `ogImage` is replaced/removed, the old asset is deleted using the previous stored URL
+  - Returns: `{ ok, data }`
+
+- `DELETE /api/admin/blog/:id`
+  - Delete a blog post
+  - Roles: `admin`, `super_admin`
+  - Cloudinary cleanup: deletes featured `image` and `ogImage` when present
+  - Returns: `{ ok, message }`
+
+- `GET /api/admin/gallery`
+  - List gallery items with optional pagination/filter query params
+  - Roles: `editor`, `admin`, `super_admin`
+  - Query params: `page`, `limit`, `status`, `category`, `type` (`image|video`), `search`
+  - Returns: `{ ok, data, pagination }`
+
+- `POST /api/admin/gallery`
+  - Create a gallery item with image/video upload
+  - Roles: `admin`, `super_admin`
+  - Content type: `multipart/form-data`
+  - File field: `file`
+  - Body fields: `title` (required), `category`, `description`, `altText`, `status` (`active|inactive|draft`), `sortOrder`
+  - Upload is handled by existing Cloudinary media upload logic; server derives `type` from mimetype
+  - Returns: `{ ok, data }`
+
+- `DELETE /api/admin/gallery/:id`
+  - Delete a gallery item and remove its Cloudinary asset (if `publicId` exists)
+  - Roles: `admin`, `super_admin`
+  - Returns: `{ ok, message }`
+
+- `POST /api/bookings`
+  - Create a new public booking (from the booking form)
+  - Returns: `{ ok, data }`
+
+- `GET /api/admin/bookings`
+  - List bookings with optional filters and pagination
+  - Roles: `editor`, `admin`, `super_admin`
+  - Query params:
+    - `status`: `PENDING|CONFIRMED|IN-PROGRESS|COMPLETED|CANCELLED|CRITICAL` (case-insensitive; legacy lowercase values are also accepted)
+    - `dateStart`, `dateEnd`: date range filters for `preferredDate` (`dateEnd` is end-exclusive)
+    - `page`, `limit`: pagination
+  - Returns: `{ ok, data, pagination }`
+
+- `GET /api/admin/bookings/:id`
+  - Fetch one booking by Mongo id
+  - Roles: `editor`, `admin`, `super_admin`
+  - Returns: `{ ok, data }`
+
+- `PUT /api/admin/bookings/:id`
+  - Update booking admin fields
+  - Roles: `admin`, `super_admin`
+  - Body: `status` and/or `notes` only
+  - Returns: `{ ok, data }`
+
+- `DELETE /api/admin/bookings/:id`
+  - Delete a booking
+  - Roles: `admin`, `super_admin`
+  - Returns: `{ ok, message }`
 
 ## Data Models
 
@@ -118,6 +233,10 @@ Black_bullet_backend/
     cloudinary.js   # Cloudinary config helper
   controllers/
     authController.js
+    adminBookingsController.js
+    adminServicesController.js
+    adminBlogController.js
+    adminGalleryController.js
     mediaController.js
   middleware/
     authMiddleware.js
@@ -127,6 +246,10 @@ Black_bullet_backend/
     mediaService.js # Cloudinary upload/delete service
   routes/
     auth.js         # Admin auth endpoints
+    adminBookings.js # Admin bookings CRUD endpoints
+    adminServices.js # Admin services CRUD endpoints
+    adminBlog.js     # Admin blog CRUD endpoints
+    adminGallery.js # Admin gallery CRUD endpoints
     health.js       # Health-check endpoint
     media.js        # Media upload/delete endpoints
   utils/
